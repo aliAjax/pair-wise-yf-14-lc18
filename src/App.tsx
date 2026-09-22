@@ -1,126 +1,143 @@
+import { useMemo, useState } from "react";
 import "./styles.css";
-
-const project = {
-  "sourceNo": 2,
-  "id": "hxyfront-62002",
-  "port": 62002,
-  "title": "剧场灯光Cue表管理",
-  "domain": "剧场灯光",
-  "prompt": "做一个给剧场灯光师使用的灯位与Cue表管理前端项目，可以维护演出名称、灯具编号、通道号、色片、焦点位置、亮度预设和Cue触发顺序。页面需要有舞台平面灯位图、Cue列表、当前场景预览、灯具筛选和演出版本备注，适合排练期间快速调整。",
-  "palette": [
-    "#7c3aed",
-    "#f59e0b",
-    "#06b6d4"
-  ],
-  "metrics": [
-    "灯具数量",
-    "Cue数量",
-    "当前场景",
-    "待确认焦点"
-  ],
-  "filters": [
-    "面光",
-    "侧光",
-    "逆光",
-    "效果光"
-  ],
-  "fields": [
-    "演出名称",
-    "灯具编号",
-    "通道号",
-    "色片",
-    "焦点位置",
-    "亮度预设"
-  ],
-  "records": [
-    [
-      "Cue 12",
-      "冷蓝侧光",
-      "CH 021-028，亮度65%",
-      "二幕开场"
-    ],
-    [
-      "Cue 18",
-      "追光入场",
-      "FOH-03，焦点门口",
-      "需演员走位确认"
-    ],
-    [
-      "Cue 24",
-      "暖色谢幕",
-      "全台面光80%",
-      "版本B"
-    ]
-  ]
-};
+import { useConsoleStore } from "./hooks/useConsoleStore";
+import { visibleFixtures } from "./lib/deviation";
+import { FIXTURE_TYPES, type FixtureType } from "./types";
+import { LockBanner } from "./components/LockOverlay";
+import { FilterPanel } from "./components/FilterPanel";
+import { StageMap } from "./components/StageMap";
+import { PreviewPanel } from "./components/PreviewPanel";
+import { CueConsole } from "./components/CueConsole";
+import { RunHistory } from "./components/RunHistory";
 
 function App() {
+  const store = useConsoleStore();
+  const { state, status } = store;
+  const [toast, setToast] = useState<string[] | null>(null);
+
+  const shownFixtures = useMemo(
+    () => visibleFixtures(state.fixtures, state.activeTypes),
+    [state.fixtures, state.activeTypes],
+  );
+
+  const counts = useMemo(() => {
+    const c = Object.fromEntries(FIXTURE_TYPES.map((t) => [t, 0])) as Record<FixtureType, number>;
+    for (const f of state.fixtures) c[f.type] += 1;
+    return c;
+  }, [state.fixtures]);
+
+  const deny = (gate: { blockers: string[] }) => {
+    setToast(gate.blockers);
+    window.setTimeout(() => setToast(null), 4200);
+  };
+
+  const metrics = [
+    { label: "灯具数量", value: state.fixtures.length },
+    { label: "Cue 数量", value: state.cues.length },
+    { label: "待复核 Cue", value: status.pendingCount, alert: status.pendingCount > 0 },
+    { label: "待复演 Cue", value: status.replayReadyCount, alert: status.replayReadyCount > 0 },
+  ];
+
   return (
     <main className="app">
       <section className="hero">
-        <p>{project.id} · 源提示词{project.sourceNo} · Port {project.port}</p>
-        <h1>{project.title}</h1>
-        <span>{project.prompt}</span>
+        <p>hxyfront-62002 · 排练偏差复核台 · Port 62002</p>
+        <h1>剧场灯光 Cue 排练偏差复核台</h1>
+        <span>
+          每次试运行登记计划/实际触发时间、操作人与偏差原因；偏差超过 8 秒或操作人为空即标记待复核。
+          待复核 Cue 锁定亮度与焦点，须导演填写处理结论、复演通过后方可调整灯位。
+          复演通过只解除当前 Cue，历史偏差保留，刷新后仍在。
+        </span>
+        <div className="show-line">
+          <input
+            value={state.show.showName}
+            onChange={(e) => store.updateShow({ showName: e.target.value })}
+            aria-label="演出名称"
+          />
+          <input
+            value={state.show.versionNote}
+            onChange={(e) => store.updateShow({ versionNote: e.target.value })}
+            aria-label="演出版本备注"
+          />
+        </div>
       </section>
 
       <section className="metrics">
-        {project.metrics.map((metric: string, index: number) => (
-          <article key={metric}>
-            <small>{metric}</small>
-            <strong>{[86, 14, 7, 32][index] ?? 12}</strong>
+        {metrics.map((m) => (
+          <article key={m.label} className={m.alert ? "alert" : ""}>
+            <small>{m.label}</small>
+            <strong>{m.value}</strong>
           </article>
         ))}
       </section>
 
+      {status.anyLock && (
+        <LockBanner pendingCount={status.pendingCount} replayReadyCount={status.replayReadyCount} />
+      )}
+
+      {toast && (
+        <div className="toast" role="alert">
+          {toast.map((t) => <p key={t}>⛔ {t}</p>)}
+        </div>
+      )}
+
       <section className="workspace">
-        <aside className="panel">
-          <h2>{project.domain}筛选</h2>
-          <div className="chips">
-            {project.filters.map((item: string) => (
-              <button key={item}>{item}</button>
-            ))}
-          </div>
-        </aside>
+        <div className="side-col">
+          <FilterPanel
+            activeTypes={state.activeTypes}
+            counts={counts}
+            locked={status.anyLock}
+            onToggle={store.toggleType}
+          />
+          <PreviewPanel
+            fixtures={state.fixtures}
+            selectedCue={status.selectedCue}
+            status={status}
+            onAdjust={(id, patch) => store.updateFixture(id, patch)}
+            onGateDeny={deny}
+          />
+        </div>
 
-        <section className="panel form-panel">
-          <div className="heading">
-            <div>
-              <p>专业字段</p>
-              <h2>新增记录</h2>
-            </div>
-            <button className="primary">保存草稿</button>
-          </div>
-          <div className="field-grid">
-            {project.fields.map((field: string) => (
-              <label key={field}>
-                <span>{field}</span>
-                <input placeholder={"填写" + field} />
-              </label>
-            ))}
-          </div>
-        </section>
+        <CueConsole
+          state={state}
+          status={status}
+          onRegister={store.registerTrial}
+          onSubmitReview={store.submitReview}
+          onSelect={store.selectCue}
+          onGateDeny={deny}
+        />
       </section>
 
-      <section className="panel">
-        <div className="heading">
-          <div>
-            <p>历史记录</p>
-            <h2>近期工作台</h2>
-          </div>
-          <button>导出摘要</button>
+      <StageMap
+        fixtures={shownFixtures}
+        selectedCue={status.selectedCue}
+        status={status}
+        onMove={(id, x, y) => store.updateFixture(id, { x, y })}
+        onGateDeny={deny}
+      />
+
+      <RunHistory state={state} status={status} />
+
+      <footer className="foot-panel panel">
+        <div>
+          <p className="foot-title">演出版本备注（自动保存在本机，刷新后仍在）</p>
+          <textarea
+            value={state.show.versionNote}
+            onChange={(e) => store.updateShow({ versionNote: e.target.value })}
+            rows={2}
+          />
         </div>
-        <div className="records">
-          {project.records.map((record: string[], index: number) => (
-            <article key={record.join("-")}>
-              <b>{String(index + 1).padStart(2, "0")}</b>
-              <div>
-                <h3>{record[0]}</h3>
-                <p>{record.slice(1).join(" · ")}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+        <button
+          className="danger"
+          onClick={() => {
+            if (window.confirm("确定重置为初始演示数据？本机所有登记与结论将被清除。")) {
+              store.reset();
+            }
+          }}
+        >
+          重置演示数据
+        </button>
+      </footer>
     </main>
   );
 }
