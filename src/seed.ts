@@ -1,0 +1,160 @@
+import type { RehearsalState } from "./types";
+
+/** 首次打开时的排练示例数据（覆盖四种复核状态） */
+export function createSeedState(): RehearsalState {
+  const now = new Date("2026-09-22T14:00:00").toISOString();
+
+  const fixtures = [
+    { id: "f1", code: "FOH-01", channel: "CH 011", category: "面光" as const, gel: "L106 暖橙", x: 18, y: 12 },
+    { id: "f2", code: "FOH-03", channel: "CH 013", category: "面光" as const, gel: "L201 冷蓝", x: 50, y: 10 },
+    { id: "f3", code: "SL-05", channel: "CH 021", category: "侧光" as const, gel: "L201 冷蓝", x: 7, y: 52 },
+    { id: "f4", code: "SL-08", channel: "CH 024", category: "侧光" as const, gel: "L139 紫红", x: 93, y: 48 },
+    { id: "f5", code: "BL-02", channel: "CH 033", category: "逆光" as const, gel: "L241 荧光蓝", x: 30, y: 88 },
+    { id: "f6", code: "BL-04", channel: "CH 035", category: "逆光" as const, gel: "L117 琥珀", x: 66, y: 90 },
+    { id: "f7", code: "FX-12", channel: "CH 051", category: "效果光" as const, gel: "L120 深蓝", x: 80, y: 78 },
+    { id: "f8", code: "FX-15", channel: "CH 054", category: "效果光" as const, gel: "L213 水蓝", x: 42, y: 80 },
+  ];
+
+  return {
+    showName: "《深夜渡轮》· 联排第三场",
+    fixtures,
+    cues: [
+      {
+        id: "c1",
+        code: "Cue 12",
+        name: "冷蓝侧光 · 二幕开场",
+        order: 1,
+        fixtureIds: ["f3", "f4", "f5"],
+        brightness: 65,
+        focusX: 50,
+        focusY: 55,
+        runs: [
+          {
+            id: "r1",
+            plannedTime: "02:10",
+            actualTime: "02:14",
+            deviationSec: 4,
+            operator: "林灯控",
+            reason: "按演员就位节奏触发",
+            isRerun: false,
+            createdAt: now,
+          },
+        ],
+        review: null,
+        releasedRunId: null,
+        note: "二幕开场基调，保持冷色",
+      },
+      {
+        id: "c2",
+        code: "Cue 18",
+        name: "追光入场",
+        order: 2,
+        fixtureIds: ["f2"],
+        brightness: 90,
+        focusX: 72,
+        focusY: 40,
+        runs: [
+          {
+            id: "r2",
+            plannedTime: "06:40",
+            actualTime: "06:55",
+            deviationSec: 15,
+            operator: "周控台",
+            reason: "追光操作员听错呼号，晚触发 15 秒",
+            isRerun: false,
+            createdAt: now,
+          },
+        ],
+        review: null,
+        releasedRunId: null,
+        note: "需演员走位确认，焦点门口",
+      },
+      {
+        id: "c3",
+        code: "Cue 22",
+        name: "雾中起航",
+        order: 3,
+        fixtureIds: ["f7", "f8", "f5"],
+        brightness: 45,
+        focusX: 40,
+        focusY: 70,
+        runs: [
+          {
+            id: "r3",
+            plannedTime: "12:30",
+            actualTime: "12:31",
+            deviationSec: 1,
+            operator: "林灯控",
+            reason: "首次联排正常",
+            isRerun: false,
+            createdAt: now,
+          },
+          {
+            id: "r4",
+            plannedTime: "18:05",
+            actualTime: "18:05",
+            deviationSec: 0,
+            operator: "",
+            reason: "紧急替班，未登记操作人",
+            isRerun: false,
+            createdAt: now,
+          },
+        ],
+        review: {
+          conclusion: "替班操作需先登记；复演时由林灯控执行并复核焦点雾区范围。",
+          director: "陈导演",
+          filledAt: now,
+        },
+        releasedRunId: null,
+        note: "雾机与效果光同步，等待复演",
+      },
+      {
+        id: "c4",
+        code: "Cue 24",
+        name: "暖色谢幕",
+        order: 4,
+        fixtureIds: ["f1", "f2", "f6"],
+        brightness: 80,
+        focusX: 50,
+        focusY: 50,
+        runs: [
+          {
+            id: "r5",
+            plannedTime: "31:20",
+            actualTime: "31:31",
+            deviationSec: 11,
+            operator: "周控台",
+            reason: "谢幕信号晚给",
+            isRerun: false,
+            createdAt: now,
+          },
+          {
+            id: "r6",
+            plannedTime: "34:00",
+            actualTime: "34:02",
+            deviationSec: 2,
+            operator: "周控台",
+            reason: "按导演结论等指挥口令，复演通过",
+            isRerun: true,
+            createdAt: now,
+          },
+        ],
+        review: {
+          conclusion: "改为跟随指挥口令触发，谢幕亮度由 85% 调到 80%。",
+          director: "陈导演",
+          filledAt: now,
+        },
+        releasedRunId: "r6",
+        note: "版本 B，复演通过",
+      },
+    ],
+    notes: [
+      {
+        id: "n1",
+        version: "联排 v0.9",
+        content: "Cue 18 追光待复核；Cue 22 待复演；谢幕按版本 B 执行。",
+        updatedAt: now,
+      },
+    ],
+  };
+}
